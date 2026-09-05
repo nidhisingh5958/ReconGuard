@@ -1,0 +1,13 @@
+[project]
+name = "reconguard-backend"
+version = "0.1.0"
+description = "ReconGuard - deterministic reconciliation engine and finance control API"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["app/services/accounting", "app/services/reconciliation", "app/services/normalization", "app/core"]

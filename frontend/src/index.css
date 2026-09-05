@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans text-base antialiased;
+    /* Figures must align vertically down a column or the table is unreadable. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A finance table is scanned, not read. Numbers stay monospaced and aligned. */
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-canvas;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-line-strong rounded;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-3;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-1 ring-accent ring-offset-0;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-panel border border-line rounded;
+  }
+
+  /* Small-caps section label. The workhorse of the whole layout. */
+  .label {
+    @apply text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3;
+  }
+
+  .th {
+    @apply label text-left font-semibold px-3 py-2 border-b border-line bg-panel
+           sticky top-0 z-10 whitespace-nowrap select-none;
+  }
+
+  .td {
+    @apply px-3 py-0 h-row border-b border-line/70 text-sm whitespace-nowrap;
+  }
+
+  .row {
+    @apply hover:bg-hover transition-colors duration-75 cursor-pointer;
+  }
+
+  .btn {
+    @apply inline-flex items-center gap-1.5 h-7 px-3 rounded border border-line-strong
+           bg-raised text-sm font-medium text-ink hover:bg-hover hover:border-ink-3
+           transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-accent {
+    @apply btn bg-accent/10 border-accent/40 text-accent hover:bg-accent/20
+           hover:border-accent/70;
+  }
+
+  .input {
+    @apply h-7 px-2 rounded border border-line-strong bg-canvas text-sm text-ink
+           placeholder:text-ink-3 focus:border-accent/60 transition-colors;
+  }
+
+  .chip {
+    @apply inline-flex items-center h-[18px] px-1.5 rounded-sm border text-2xs
+           font-medium tracking-wide whitespace-nowrap;
+  }
+
+  /* Hairline separator used between dense metric cells. */
+  .rule-v {
+    @apply border-l border-line;
+  }
+}
+
+/* Recharts overrides: the grid must recede, never compete with the data. */
+.recharts-cartesian-axis-tick text {
+  fill: #69727e;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.recharts-cartesian-grid line {
+  stroke: #232830;
+}
+.recharts-tooltip-wrapper {
+  outline: none;
+}
