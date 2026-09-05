@@ -25,6 +25,7 @@ interface RunContextValue {
 }
 
 const RunContext = createContext<RunContextValue | null>(null)
+const ACTIVE_RUN_STORAGE_KEY = 'reconguard.activeRunId'
 
 /**
  * Holds the currently selected reconciliation run.
@@ -36,11 +37,18 @@ const RunContext = createContext<RunContextValue | null>(null)
  */
 export function RunProvider({ children }: { children: ReactNode }) {
   const [runs, setRuns] = useState<RunSummary[]>([])
-  const [activeRunId, setActiveRunId] = useState<string | null>(null)
+  const [activeRunId, setActiveRunIdState] = useState<string | null>(() => {
+    return window.localStorage.getItem(ACTIVE_RUN_STORAGE_KEY)
+  })
   const [health, setHealth] = useState<Health | null>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const setActiveRunId = useCallback((runId: string) => {
+    setActiveRunIdState(runId)
+    window.localStorage.setItem(ACTIVE_RUN_STORAGE_KEY, runId)
+  }, [])
 
   const reload = useCallback(async () => {
     try {
@@ -51,18 +59,22 @@ export function RunProvider({ children }: { children: ReactNode }) {
       setRuns(runsResponse.runs)
       setHealth(healthResponse)
       setError(null)
-      setActiveRunId((current) => {
-        if (current && runsResponse.runs.some((r) => r.run_id === current)) {
-          return current
-        }
-        return runsResponse.runs[0]?.run_id ?? null
-      })
+      const nextRunId =
+        activeRunId && runsResponse.runs.some((r) => r.run_id === activeRunId)
+          ? activeRunId
+          : runsResponse.runs[0]?.run_id ?? null
+      if (nextRunId) {
+        setActiveRunId(nextRunId)
+      } else {
+        setActiveRunIdState(null)
+        window.localStorage.removeItem(ACTIVE_RUN_STORAGE_KEY)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reach the API')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeRunId, setActiveRunId])
 
   useEffect(() => {
     void reload()
@@ -83,7 +95,7 @@ export function RunProvider({ children }: { children: ReactNode }) {
         setRunning(false)
       }
     },
-    [],
+    [setActiveRunId],
   )
 
   const value = useMemo<RunContextValue>(

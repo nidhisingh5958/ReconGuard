@@ -30,6 +30,17 @@ def _env_str(name: str, default: str) -> str:
     return raw if raw not in (None, "") else default
 
 
+def _database_url() -> str:
+    configured = _env_str(
+        "RECONGUARD_DATABASE_URL",
+        f"sqlite:///{(DATA_DIR / 'reconguard.db').as_posix()}",
+    )
+    if not configured.startswith("sqlite:///./"):
+        return configured
+    relative_path = configured.removeprefix("sqlite:///./")
+    return f"sqlite:///{(PROJECT_ROOT / relative_path).resolve().as_posix()}"
+
+
 @dataclass(frozen=True)
 class AccountingConfig:
     """Deterministic accounting parameters, all in basis points (100 bps = 1%)."""
@@ -69,11 +80,7 @@ class Settings:
     app_name: str = "ReconGuard"
     system_version: str = "reconguard/0.1.0"
     api_prefix: str = "/api"
-    database_url: str = field(
-        default_factory=lambda: _env_str(
-            "RECONGUARD_DATABASE_URL", f"sqlite:///{(DATA_DIR / 'reconguard.db').as_posix()}"
-        )
-    )
+    database_url: str = field(default_factory=_database_url)
     ai_provider: str = field(default_factory=lambda: _env_str("RECONGUARD_AI_PROVIDER", "none"))
     llm_provider: str = field(default_factory=lambda: _env_str("LLM_PROVIDER", _env_str("RECONGUARD_AI_PROVIDER", "none")))
     llm_model: str = field(default_factory=lambda: _env_str("LLM_MODEL", ""))
