@@ -281,4 +281,9 @@ POST /api/copilot/ask                             grounded retrieval
      <a href="assets/videos/ReconGuard_Demo.mp4">Watch the ReconGuard demo</a>
 </video>
 
+Prefer YouTube? **[Watch the demo online](https://youtu.be/WeTr0r3L0Ig)**
+
+The original recording is also available locally at
+`assets/videos/ReconGuard_Demo.mp4`.
+
 
