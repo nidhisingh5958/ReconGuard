@@ -273,5 +273,12 @@ POST /api/copilot/ask                             grounded retrieval
 | 🔭 [future-ai-layer.md](docs/future-ai-layer.md) | roadmap: shipped, deliberately absent, next |
 | 🔒 [SECURITY.md](SECURITY.md) | threat model, AI containment, known gaps |
 
-  
+---
+
+## 🎥 Product demo
+
+<video src="assets/videos/ReconGuard_Demo.mp4" controls width="100%">
+     <a href="assets/videos/ReconGuard_Demo.mp4">Watch the ReconGuard demo</a>
+</video>
+
 
