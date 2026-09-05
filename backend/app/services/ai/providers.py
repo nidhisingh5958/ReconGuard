@@ -30,6 +30,7 @@ DEFAULT_MAX_TOKENS = 1024
 #: reasoning, so the largest model buys nothing here.
 ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-5"
 OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
+GEMINI_DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 class ProviderError(RuntimeError):
@@ -195,6 +196,57 @@ class OpenAIProvider(LLMProvider):
         )
 
 
+class GeminiProvider(LLMProvider):
+    """Google Gemini generateContent API."""
+
+    name = "gemini"
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        base_url: str = "https://generativelanguage.googleapis.com/v1beta/models",
+    ) -> None:
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
+        if not self.api_key:
+            raise ProviderError("GEMINI_API_KEY is not set")
+        self.model = model or os.getenv("GEMINI_MODEL", GEMINI_DEFAULT_MODEL)
+        self.timeout = timeout
+        self.base_url = base_url.rstrip("/")
+
+    def complete_json(self, system: str, user: str) -> ProviderResponse:
+        import httpx
+
+        body = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": user}]}],
+            "generationConfig": {
+                "temperature": 0,
+                "responseMimeType": "application/json",
+            },
+        }
+        try:
+            response = httpx.post(
+                f"{self.base_url}/{self.model}:generateContent",
+                params={"key": self.api_key},
+                json=body,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            data = response.json()
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as exc:
+            raise ProviderError(f"gemini request failed: {exc}") from exc
+
+        return ProviderResponse(
+            payload=extract_json(text),
+            raw_text=text,
+            model=data.get("modelVersion", self.model),
+            provider=self.name,
+        )
+
+
 class ScriptedProvider(LLMProvider):
     """A provider that replays canned responses. For tests only.
 
@@ -233,4 +285,6 @@ def build_provider(name: str, **kwargs: Any) -> LLMProvider:
         return AnthropicProvider(**kwargs)
     if normalised in ("openai", "gpt"):
         return OpenAIProvider(**kwargs)
+    if normalised in ("gemini", "google", "google-gemini"):
+        return GeminiProvider(**kwargs)
     raise ProviderError(f"unknown model provider {name!r}")

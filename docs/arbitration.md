@@ -132,8 +132,8 @@ Everything else is `PROBABLE` (a booking proposal) or `UNRESOLVED`.
 
 ## 🧠 The LLM arbitrator
 
-`LLMResidualArbitrator` is fully implemented over Anthropic and OpenAI. What the
-model is asked to do is narrow, and that narrowness is the point:
+`LLMResidualArbitrator` is fully implemented over Gemini, Anthropic and OpenAI.
+What the model is asked to do is narrow, and that narrowness is the point:
 
 - which of the **offered** candidates (if any) explains this residual
 - which of the **permitted** bookkeeping actions applies
@@ -150,8 +150,10 @@ name an account.
 | 🧾 JSON parsing | Fenced and prose-wrapped output is unwrapped; **malformed JSON is an error, never repaired**. |
 | 🪂 Failure | Provider error, unparseable output, or nonsense decision → falls back to the deterministic arbitrator with the reason appended. |
 
-Configure with `RECONGUARD_AI_PROVIDER=anthropic` (or `openai`) plus the
-matching API key. The default is `none`.
+Configure with `RECONGUARD_AI_PROVIDER=gemini` (or `anthropic` or `openai`) plus
+the matching API key. Gemini uses `GEMINI_API_KEY` and defaults to
+`gemini-2.5-flash`; override it with `GEMINI_MODEL` when needed. The default is
+`none`.
 
 ---
 
