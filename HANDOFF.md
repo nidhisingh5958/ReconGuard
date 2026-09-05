@@ -119,14 +119,14 @@ and reachable; the `PREVIEW` "next" badge set in `Layout.tsx` is now empty.
 ## 🚀 Run it
 
 ```bash
-cd backend  && python -m uvicorn app.main:app --reload   # :8000, docs at /docs
+cd backend  && uv run uvicorn app.main:app --reload   # :8000, docs at /docs
 cd frontend && npm run dev                               # :5173
 ```
 
 Verify:
 
 ```bash
-cd backend  && python -m pytest && python -m scripts.benchmark
+cd backend  && uv run pytest && uv run python -m scripts.benchmark
 cd frontend && npm test && npx tsc -b --noEmit && npm run build
 ```
 

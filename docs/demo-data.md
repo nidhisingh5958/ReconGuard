@@ -8,9 +8,9 @@ Nav: [Architecture](architecture.md) · [Data model](data-model.md) · [Reconcil
 
 ```bash
 cd backend
-python -m scripts.generate_dataset --messy               # 500 orders, seed 42 -> data/seed-500/
-python -m scripts.generate_dataset --clean --count 500
-python -m scripts.generate_dataset --messy --count 10000 --seed 7
+uv run python -m scripts.generate_dataset --messy               # 500 orders, seed 42 -> data/seed-500/
+uv run python -m scripts.generate_dataset --clean --count 500
+uv run python -m scripts.generate_dataset --messy --count 10000 --seed 7
 ```
 
 Or via the API:
@@ -115,7 +115,7 @@ base engine is *expected to fail on* — it exists so the
 ## Measured results
 
 ```bash
-cd backend && python -m scripts.benchmark
+cd backend && uv run python -m scripts.benchmark
 ```
 
 ### Ground truth: 100% precision and recall

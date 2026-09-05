@@ -47,9 +47,9 @@ Two terminals. No external services, no API keys.
 ```bash
 # 1️⃣  backend
 cd backend
-pip install -r requirements-dev.txt
-python -m scripts.generate_dataset --messy      # 500 orders → data/seed-500/
-python -m uvicorn app.main:app --reload         # http://127.0.0.1:8000  · docs at /docs
+uv sync --extra dev                              # installs all deps into .venv
+uv run python -m scripts.generate_dataset --messy   # 500 orders → data/seed-500/
+uv run uvicorn app.main:app --reload            # http://127.0.0.1:8000  · docs at /docs
 
 # 2️⃣  frontend
 cd frontend
@@ -68,8 +68,8 @@ RECONGUARD_DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/reconguard
 ## 🔬 Verify it
 
 ```bash
-cd backend  && python -m pytest              # 180 tests — engine, accounting, arbitration, rules
-cd backend  && python -m scripts.benchmark   # throughput + ground-truth precision/recall
+cd backend  && uv run pytest              # 180 tests — engine, accounting, arbitration, rules
+cd backend  && uv run python -m scripts.benchmark   # throughput + ground-truth precision/recall
 cd frontend && npm test && npm run build     # 17 tests + typecheck + production build
 ```
 
@@ -272,4 +272,4 @@ POST /api/copilot/ask                             grounded retrieval
 | 📈 [forecasting-and-copilot.md](docs/forecasting-and-copilot.md) | backtested forecasting, grounded Q&A |
 | 🔭 [future-ai-layer.md](docs/future-ai-layer.md) | roadmap: shipped, deliberately absent, next |
 | 🔒 [SECURITY.md](SECURITY.md) | threat model, AI containment, known gaps |
-# ReconGuard
+
