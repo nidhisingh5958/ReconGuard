@@ -273,4 +273,5 @@ POST /api/copilot/ask                             grounded retrieval
 | 🔭 [future-ai-layer.md](docs/future-ai-layer.md) | roadmap: shipped, deliberately absent, next |
 | 🔒 [SECURITY.md](SECURITY.md) | threat model, AI containment, known gaps |
 
+  
 
