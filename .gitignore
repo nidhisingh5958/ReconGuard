@@ -21,3 +21,7 @@ data/*/
 # Environment
 .env
 tsconfig.tsbuildinfo
+
+# IDEs
+.vscode/
+
