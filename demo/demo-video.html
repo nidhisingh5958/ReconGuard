@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ReconGuard — Demo Presentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ─── DESIGN TOKENS ─────────────────────────────────────────────────────── */
+:root {
+  --canvas:       #0A0C0F;
+  --panel:        #12151A;
+  --raised:       #171B21;
+  --hover:        #1C222A;
+  --line:         #232830;
+  --line-strong:  #2F3641;
+  --ink:          #E8EBEF;
+  --ink-2:        #99A2AD;
+  --ink-3:        #69727E;
+  --accent:       #F0B429;
+  --matched:      #3FCF8E;
+  --partial:      #56A8F5;
+  --review:       #F0B429;
+  --duplicate:    #B98AFF;
+  --exception:    #FF6B6B;
+  --unresolved:   #FF9A62;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+  background: var(--canvas);
+  font-family: 'Inter', sans-serif;
+  color: var(--ink);
+}
+
+/* ─── HUD ─────────────────────────────────────────────────────────────────── */
+#hud {
+  position: fixed;
+  top: 18px; right: 24px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+#hud-scene { color: var(--accent); font-weight: 600; }
+#hud-timer { color: var(--ink-2); }
+#hud-state {
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: 0.08em;
+}
+
+/* ─── SCENE CONTAINER ────────────────────────────────────────────────────── */
+#scene-container {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 60px 80px;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+.scene.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ─── PROGRESS BAR ───────────────────────────────────────────────────────── */
+#progress-container {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 900;
+  height: 3px;
+  background: var(--line);
+}
+#progress-bar {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+/* ─── VOICEOVER CAPTION ──────────────────────────────────────────────────── */
+#caption {
+  position: fixed;
+  bottom: 14px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 800;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink-3);
+  text-align: center;
+  max-width: 800px;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  pointer-events: none;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+#caption.visible { opacity: 1; }
+
+/* ─── KEYBOARD HINT ──────────────────────────────────────────────────────── */
+#keyhint {
+  position: fixed;
+  bottom: 14px; right: 24px;
+  z-index: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+/* ─── COMMON COMPONENTS ──────────────────────────────────────────────────── */
+.scene-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  margin-bottom: 28px;
+  text-align: center;
+}
+.scene-title .accent { color: var(--accent); }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 24px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.chip-matched   { background: rgba(63,207,142,0.12);  color: var(--matched);   border: 1px solid rgba(63,207,142,0.25); }
+.chip-partial   { background: rgba(86,168,245,0.12);  color: var(--partial);   border: 1px solid rgba(86,168,245,0.25); }
+.chip-review    { background: rgba(240,180,41,0.12);  color: var(--review);    border: 1px solid rgba(240,180,41,0.25); }
+.chip-duplicate { background: rgba(185,138,255,0.12); color: var(--duplicate); border: 1px solid rgba(185,138,255,0.25); }
+.chip-exception { background: rgba(255,107,107,0.12); color: var(--exception); border: 1px solid rgba(255,107,107,0.25); }
+.chip-accent    { background: rgba(240,180,41,0.12);  color: var(--accent);    border: 1px solid rgba(240,180,41,0.25); }
+.chip-muted     { background: rgba(105,114,126,0.12); color: var(--ink-3);     border: 1px solid rgba(105,114,126,0.25); }
+.chip-green     { background: rgba(63,207,142,0.12);  color: var(--matched);   border: 1px solid rgba(63,207,142,0.25); }
+
+.mono { font-family: 'JetBrains Mono', monospace; }
+.text-accent    { color: var(--accent); }
+.text-matched   { color: var(--matched); }
+.text-partial   { color: var(--partial); }
+.text-exception { color: var(--exception); }
+.text-ink2      { color: var(--ink-2); }
+.text-ink3      { color: var(--ink-3); }
+
+/* fade-in utility */
+.fade-item {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.fade-item.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─── SCENE 1 ─────────────────────────────────────────────────────────────── */
+#s1-sources {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+.s1-source {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+.s1-source.visible { opacity: 1; }
+.s1-dot { color: var(--line-strong); opacity: 0.5; font-size: 11px; }
+
+#s1-chaos {
+  position: relative;
+  width: 700px;
+  height: 180px;
+  margin-bottom: 32px;
+  flex-shrink: 0;
+}
+.chaos-line {
+  position: absolute;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.chaos-line.visible { opacity: 1; }
+
+#s1-pipeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+#s1-pipeline.visible { opacity: 1; }
+.s1-arrow-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+}
+.s1-down-arrow {
+  font-size: 28px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+#s1-logo {
+  margin-top: 18px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+#s1-logo.visible { opacity: 1; }
+
+/* ─── SCENE 2 ─────────────────────────────────────────────────────────────── */
+#s2-shell {
+  display: flex;
+  width: 880px;
+  height: 460px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--canvas);
+}
+#s2-sidebar {
+  width: 140px;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.s2-nav {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--ink-3);
+  cursor: default;
+  letter-spacing: 0.02em;
+}
+.s2-nav.active {
+  color: var(--accent);
+  background: rgba(240,180,41,0.07);
+  border-right: 2px solid var(--accent);
+}
+#s2-main {
+  flex: 1;
+  background: var(--canvas);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+#s2-main-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+#s2-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.s2-empty-icon { font-size: 32px; opacity: 0.4; }
+.s2-empty-text { font-size: 14px; color: var(--ink-3); }
+#s2-run-btn {
+  padding: 10px 24px;
+  background: var(--accent);
+  color: #0A0C0F;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  text-transform: uppercase;
+  font-family: 'Inter', sans-serif;
+}
+#s2-run-btn.clicked { opacity: 0.45; }
+#s2-stats { display: none; flex-direction: column; gap: 10px; }
+#s2-stats.visible { display: flex; }
+.s2-stat-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.s2-stat-chip {
+  padding: 8px 16px;
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.06em;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.s2-stat-chip.show { opacity: 1; }
+.s2-source-badge {
+  padding: 5px 14px;
+  background: rgba(86,168,245,0.08);
+  border: 1px solid rgba(86,168,245,0.2);
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--partial);
+  letter-spacing: 0.08em;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.s2-source-badge.show { opacity: 1; }
+#s2-counter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--matched);
+  display: none;
+  margin-bottom: 2px;
+}
+#s2-counter-label {
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: none;
+}
+#s2-counter.visible, #s2-counter-label.visible { display: block; }
+
+/* ─── SCENE 3 ─────────────────────────────────────────────────────────────── */
+#s3-cols {
+  display: flex;
+  gap: 0;
+  width: 840px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.s3-col { flex: 1; padding: 22px; }
+.s3-col-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.s3-arrow-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  font-size: 22px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+.s3-raw-line {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 2.4;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.s3-raw-line.show { opacity: 1; }
+.s3-norm-card {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  opacity: 0;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  transform: translateX(-8px);
+}
+.s3-norm-card.show { opacity: 1; transform: translateX(0); }
+.s3-norm-field {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.9;
+  color: var(--ink);
+}
+.s3-norm-field .k { color: var(--ink-3); }
+.s3-norm-field .v { color: var(--matched); }
+.s3-original {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 5px;
+  font-style: italic;
+  font-family: 'JetBrains Mono', monospace;
+  border-top: 1px solid var(--line);
+  padding-top: 5px;
+}
+
+/* ─── SCENE 4 ─────────────────────────────────────────────────────────────── */
+#s4-drawer {
+  width: 500px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 26px;
+}
+#s4-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.s4-calc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  padding: 5px 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.s4-calc-row .label { color: var(--ink-3); }
+.s4-calc-row .val { color: var(--ink); }
+.s4-calc-row .neg { color: var(--exception); }
+.s4-calc-row.show { opacity: 1; }
+.s4-divider-row {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--line-strong);
+  padding: 6px 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  letter-spacing: 0.02em;
+}
+.s4-divider-row.show { opacity: 1; }
+.s4-total-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 6px 0;
+  color: var(--ink);
+  border-top: 1px solid var(--line-strong);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.s4-total-row.show { opacity: 1; }
+.s4-balance {
+  margin-top: 18px;
+  padding: 13px;
+  background: rgba(63,207,142,0.06);
+  border: 1px solid rgba(63,207,142,0.2);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.s4-balance.show { opacity: 1; }
+.s4-balance-mark { font-size: 18px; color: var(--matched); }
+.s4-balance-text { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: var(--matched); }
+.s4-meta {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.s4-meta.show { opacity: 1; }
+.s4-meta-item { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); letter-spacing: 0.04em; }
+.s4-meta-item .val { color: var(--ink-2); }
+
+/* ─── SCENE 5 ─────────────────────────────────────────────────────────────── */
+#s5-content { width: 620px; }
+#s5-progress-wrap { margin-bottom: 20px; opacity: 0; transition: opacity 0.5s ease; }
+#s5-progress-wrap.show { opacity: 1; }
+#s5-progress-track { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+#s5-progress-fill { height: 100%; background: var(--matched); width: 0%; transition: width 2s ease-in-out; }
+#s5-progress-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; }
+#s5-run-stats { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: var(--matched); margin-bottom: 24px; opacity: 0; transition: opacity 0.5s ease; }
+#s5-run-stats.show { opacity: 1; }
+.s5-layer {
+  display: flex;
+  align-items: center;
+  padding: 11px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  margin-bottom: 7px;
+  opacity: 0;
+  transition: opacity 0.5s ease, border-color 0.5s ease, background 0.5s ease;
+  gap: 12px;
+}
+.s5-layer.show { opacity: 1; }
+.s5-layer.lit { border-color: rgba(63,207,142,0.3); background: rgba(63,207,142,0.04); }
+.s5-layer-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--ink-3); width: 22px; text-align: center; }
+.s5-layer-name { font-size: 13px; font-weight: 600; color: var(--ink); letter-spacing: 0.04em; flex: 1; }
+.s5-layer-count { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--matched); }
+.s5-layer-check { font-size: 15px; color: var(--matched); opacity: 0; transition: opacity 0.3s ease; }
+.s5-layer.lit .s5-layer-check { opacity: 1; }
+#s5-exception-row {
+  display: flex;
+  align-items: center;
+  padding: 9px 14px;
+  background: rgba(255,107,107,0.06);
+  border: 1px solid rgba(255,107,107,0.25);
+  border-radius: 4px;
+  margin-top: 7px;
+  gap: 12px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+#s5-exception-row.show { opacity: 1; }
+.s5-exc-id { color: var(--exception); font-weight: 600; }
+.s5-exc-reason { color: var(--ink-3); }
+#s5-statement { margin-top: 18px; text-align: center; font-size: 22px; font-weight: 800; letter-spacing: 0.12em; color: var(--ink); opacity: 0; transition: opacity 0.6s ease; }
+#s5-statement.show { opacity: 1; }
+
+/* ─── SCENE 6 ─────────────────────────────────────────────────────────────── */
+#s6-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 840px; margin-bottom: 20px; }
+.s6-metric { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px 14px; opacity: 0; transition: opacity 0.5s ease; }
+.s6-metric.show { opacity: 1; }
+.s6-metric-label { font-size: 10px; font-weight: 600; letter-spacing: 0.14em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px; }
+.s6-metric-value { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+.s6-metric-value.green { color: var(--matched); }
+#s6-dist { width: 840px; }
+.s6-dist-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; opacity: 0; transition: opacity 0.4s ease; }
+.s6-dist-row.show { opacity: 1; }
+.s6-dist-name { width: 90px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.s6-dist-count { width: 40px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--ink); text-align: right; }
+.s6-dist-bar-wrap { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.s6-dist-bar { height: 100%; border-radius: 4px; width: 0%; transition: width 1s ease; }
+.s6-dist-pct { width: 45px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); text-align: right; }
+#s6-banner { margin-top: 16px; padding: 9px 20px; background: rgba(240,180,41,0.06); border: 1px solid rgba(240,180,41,0.2); border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); opacity: 0; transition: opacity 0.5s ease; text-align: center; }
+#s6-banner.show { opacity: 1; }
+
+/* ─── SCENE 7 ─────────────────────────────────────────────────────────────── */
+#s7-layout { display: flex; gap: 0; width: 900px; }
+#s7-table-wrap { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 6px 0 0 6px; overflow: hidden; }
+.s7-col-heads { display: flex; padding: 8px 14px; background: var(--raised); border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--ink-3); text-transform: uppercase; }
+.s7-th { flex: 1; }
+.s7-th-exp { width: 100px; text-align: right; }
+.s7-row { display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; opacity: 0; transition: opacity 0.4s ease, background 0.2s; }
+.s7-row.show { opacity: 1; }
+.s7-row.selected { background: var(--hover); }
+.s7-cell { flex: 1; color: var(--ink-2); }
+.s7-cell-exp { width: 100px; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+#s7-drawer { width: 280px; background: var(--panel); border: 1px solid var(--line); border-left: none; border-radius: 0 6px 6px 0; padding: 18px; opacity: 0; transition: opacity 0.5s ease; flex-shrink: 0; overflow-y: auto; }
+#s7-drawer.show { opacity: 1; }
+.s7-drawer-title { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 14px; }
+.s7-drawer-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; gap: 8px; }
+.s7-drawer-row:last-of-type { border-bottom: none; }
+.s7-drawer-key { color: var(--ink-3); flex-shrink: 0; }
+.s7-drawer-val { color: var(--ink); font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: right; }
+#s7-overlay { margin-top: 14px; padding: 10px; background: rgba(240,180,41,0.06); border: 1px solid rgba(240,180,41,0.2); border-radius: 3px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); text-align: center; opacity: 0; transition: opacity 0.5s ease; }
+#s7-overlay.show { opacity: 1; }
+
+/* ─── SCENE 8 ─────────────────────────────────────────────────────────────── */
+#s8-pipeline { display: flex; align-items: center; gap: 0; margin-bottom: 28px; opacity: 0; transition: opacity 0.5s ease; }
+#s8-pipeline.show { opacity: 1; }
+.s8-box { padding: 14px 20px; border-radius: 6px; text-align: center; }
+.s8-box-green { background: rgba(63,207,142,0.06); border: 2px solid rgba(63,207,142,0.3); }
+.s8-box-amber { background: rgba(240,180,41,0.06); border: 2px dashed rgba(240,180,41,0.4); }
+.s8-box-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1.5; }
+.s8-connector { padding: 0 12px; font-size: 20px; color: var(--ink-3); }
+#s8-proposal { width: 400px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; opacity: 0; transition: opacity 0.6s ease; }
+#s8-proposal.show { opacity: 1; }
+#s8-proposal-header { background: var(--raised); padding: 10px 16px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--line); }
+#s8-proposal-body { padding: 14px 16px; }
+.s8-prop-row { display: flex; gap: 16px; padding: 5px 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; border-bottom: 1px solid var(--line); }
+.s8-prop-row:last-child { border-bottom: none; }
+.s8-prop-key { color: var(--ink-3); width: 100px; flex-shrink: 0; }
+.s8-prop-val { color: var(--ink); }
+#s8-providers { display: flex; gap: 10px; margin-top: 16px; opacity: 0; transition: opacity 0.5s ease; }
+#s8-providers.show { opacity: 1; }
+#s8-fallback { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); letter-spacing: 0.06em; opacity: 0; transition: opacity 0.5s ease; }
+#s8-fallback.show { opacity: 1; }
+#s8-statement { margin-top: 16px; font-size: 15px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink); text-align: center; opacity: 0; transition: opacity 0.5s ease; }
+#s8-statement.show { opacity: 1; }
+
+/* ─── SCENE 9 ─────────────────────────────────────────────────────────────── */
+#s9-content { width: 520px; }
+.s9-section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 10px; }
+.s9-check-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 6px; font-size: 14px; font-weight: 500; letter-spacing: 0.03em; opacity: 0; transition: opacity 0.4s ease; }
+.s9-check-item.show { opacity: 1; }
+.s9-check-item.pass { border-color: rgba(63,207,142,0.25); background: rgba(63,207,142,0.04); }
+.s9-check-item.fail { border-color: rgba(255,107,107,0.25); background: rgba(255,107,107,0.04); }
+.s9-mark { font-size: 16px; }
+.s9-result { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 4px; font-size: 16px; font-weight: 700; letter-spacing: 0.06em; margin-top: 8px; opacity: 0; transition: opacity 0.5s ease; }
+.s9-result.show { opacity: 1; }
+.s9-result.pass { background: rgba(63,207,142,0.08); border: 1px solid rgba(63,207,142,0.3); color: var(--matched); }
+.s9-result.fail { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.3); color: var(--exception); }
+#s9-failed-case { margin-top: 20px; opacity: 0; transition: opacity 0.5s ease; }
+#s9-failed-case.show { opacity: 1; }
+#s9-grand { margin-top: 20px; text-align: center; font-size: 18px; font-weight: 800; letter-spacing: 0.08em; color: var(--ink); line-height: 1.5; opacity: 0; transition: opacity 0.6s ease; }
+#s9-grand.show { opacity: 1; }
+
+/* ─── SCENE 10 ─────────────────────────────────────────────────────────────── */
+#s10-card { width: 460px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; opacity: 0; transition: opacity 0.6s ease; }
+#s10-card.show { opacity: 1; }
+#s10-card-header { background: var(--raised); padding: 11px 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--line); }
+#s10-card-body { padding: 20px; }
+.s10-journal-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+.s10-journal-row:last-child { border-bottom: none; }
+.s10-dr { color: var(--partial); font-weight: 600; margin-right: 8px; }
+.s10-cr { color: var(--matched); font-weight: 600; margin-right: 8px; }
+.s10-acct { color: var(--ink-2); }
+.s10-amt { color: var(--ink); font-weight: 600; }
+.s10-meta { margin-top: 14px; }
+.s10-meta-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+.s10-meta-key { color: var(--ink-3); }
+.s10-meta-val { color: var(--ink-2); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+#s10-buttons { display: flex; gap: 10px; margin-top: 18px; }
+.s10-btn { padding: 10px 18px; border-radius: 4px; font-weight: 700; font-size: 13px; letter-spacing: 0.08em; border: none; cursor: pointer; font-family: 'Inter', sans-serif; text-transform: uppercase; transition: opacity 0.2s; }
+.s10-btn-approve { background: var(--accent); color: #0A0C0F; }
+.s10-btn-reject { background: var(--raised); color: var(--ink-3); border: 1px solid var(--line-strong); }
+#s10-confirm { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; opacity: 0; transition: opacity 0.5s ease; }
+#s10-confirm.show { opacity: 1; }
+#s10-statement { margin-top: 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); text-align: center; opacity: 0; transition: opacity 0.5s ease; }
+#s10-statement.show { opacity: 1; }
+
+/* ─── SCENE 11 ─────────────────────────────────────────────────────────────── */
+#s11-content { width: 720px; }
+#s11-rule-card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px 22px; margin-bottom: 14px; opacity: 0; transition: opacity 0.5s ease; }
+#s11-rule-card.show { opacity: 1; }
+#s11-rule-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.s11-rule-id { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: var(--ink); }
+.s11-rule-field { display: flex; gap: 10px; padding: 5px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
+.s11-rule-field:last-child { border-bottom: none; }
+.s11-rule-key { color: var(--ink-3); width: 130px; flex-shrink: 0; }
+.s11-rule-val { color: var(--ink-2); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.s11-action-btn { padding: 8px 18px; border-radius: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity 0.2s; opacity: 0; }
+.s11-action-btn.show { opacity: 1; }
+#s11-validate-btn { background: var(--raised); border: 1px solid var(--line-strong); color: var(--ink); }
+#s11-approve-btn { background: rgba(240,180,41,0.15); border: 1px solid var(--accent); color: var(--accent); }
+#s11-replay { margin: 10px 0; opacity: 0; transition: opacity 0.5s ease; }
+#s11-replay.show { opacity: 1; }
+#s11-replay-track { height: 4px; background: var(--line); border-radius: 3px; margin-bottom: 6px; overflow: hidden; }
+#s11-replay-fill { height: 100%; background: var(--partial); width: 0%; transition: width 1.5s ease; }
+#s11-replay-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.08em; }
+#s11-results { background: rgba(63,207,142,0.04); border: 1px solid rgba(63,207,142,0.2); border-radius: 4px; padding: 12px 14px; margin: 10px 0; opacity: 0; transition: opacity 0.5s ease; }
+#s11-results.show { opacity: 1; }
+.s11-result-row { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--matched); padding: 3px 0; }
+#s11-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; opacity: 0; transition: opacity 0.5s ease; }
+#s11-compare.show { opacity: 1; }
+.s11-compare-box { padding: 12px 14px; border-radius: 4px; border: 1px solid var(--line); background: var(--raised); }
+.s11-compare-box.after { border-color: rgba(63,207,142,0.25); background: rgba(63,207,142,0.04); }
+.s11-compare-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 4px; }
+.s11-compare-val { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--ink); }
+.s11-compare-sub { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.s11-compare-delta { font-size: 12px; font-weight: 700; color: var(--matched); margin-top: 4px; }
+#s11-ai-bar { margin-top: 14px; opacity: 0; transition: opacity 0.5s ease; }
+#s11-ai-bar.show { opacity: 1; }
+.s11-ai-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 6px; }
+.s11-ai-track-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 5px; }
+.s11-ai-tag { font-size: 11px; color: var(--ink-3); width: 50px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+.s11-ai-track { flex: 1; height: 18px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.s11-ai-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 1.5s ease; }
+.s11-ai-fill.before { background: var(--exception); }
+.s11-ai-fill.after { background: rgba(86,168,245,0.6); }
+.s11-ai-pct { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; width: 50px; text-align: right; color: var(--ink-2); }
+#s11-reduction { font-size: 20px; font-weight: 800; color: var(--matched); text-align: center; letter-spacing: 0.06em; margin-top: 8px; }
+#s11-flow { text-align: center; font-size: 13px; font-weight: 700; letter-spacing: 0.16em; color: var(--ink-3); text-transform: uppercase; margin-top: 10px; opacity: 0; transition: opacity 0.5s ease; }
+#s11-flow.show { opacity: 1; }
+#s11-flow .accent { color: var(--accent); }
+
+/* ─── SCENE 12 ─────────────────────────────────────────────────────────────── */
+#s12-content { width: 800px; }
+#s12-header-metric { margin-bottom: 16px; opacity: 0; transition: opacity 0.5s ease; }
+#s12-header-metric.show { opacity: 1; }
+.s12-metric-label { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 4px; }
+.s12-metric-val { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 700; color: var(--matched); }
+#s12-chart-wrap { width: 100%; height: 180px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 18px; position: relative; overflow: hidden; margin-bottom: 12px; opacity: 0; transition: opacity 0.6s ease; }
+#s12-chart-wrap.show { opacity: 1; }
+#s12-chart-svg { width: 100%; height: 100%; }
+#s12-legend { display: flex; gap: 18px; margin-bottom: 14px; font-size: 12px; color: var(--ink-3); opacity: 0; transition: opacity 0.5s ease; }
+#s12-legend.show { opacity: 1; }
+.s12-legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+#s12-payroll { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; opacity: 0; transition: opacity 0.5s ease; }
+#s12-payroll.show { opacity: 1; }
+.s12-payroll-box { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 11px 13px; }
+.s12-payroll-label { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 4px; }
+.s12-payroll-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; color: var(--ink); }
+#s12-disclaimer { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--ink-3); text-align: center; text-transform: uppercase; opacity: 0; transition: opacity 0.5s ease; }
+#s12-disclaimer.show { opacity: 1; }
+
+/* ─── SCENE 13 ─────────────────────────────────────────────────────────────── */
+#s13-chat { width: 580px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; max-height: 470px; }
+#s13-chat-header { background: var(--raised); padding: 11px 18px; font-size: 13px; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--line); letter-spacing: 0.04em; }
+#s13-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.s13-bubble { max-width: 88%; padding: 10px 13px; border-radius: 6px; font-size: 14px; line-height: 1.55; opacity: 0; transition: opacity 0.5s ease; }
+.s13-bubble.show { opacity: 1; }
+.s13-bubble.user { align-self: flex-end; background: rgba(86,168,245,0.12); border: 1px solid rgba(86,168,245,0.2); color: var(--ink); }
+.s13-bubble.system { align-self: flex-start; background: var(--raised); border: 1px solid var(--line); color: var(--ink-2); }
+.s13-bubble.refused { align-self: flex-start; background: rgba(255,107,107,0.06); border: 1px solid rgba(255,107,107,0.25); color: var(--ink-2); }
+.s13-source-link { display: inline-block; margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); border: 1px solid var(--line); padding: 2px 6px; border-radius: 3px; }
+.s13-refused-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--exception); margin-bottom: 5px; }
+#s13-grounded { margin-top: 12px; font-size: 14px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink-3); text-align: center; text-transform: uppercase; opacity: 0; transition: opacity 0.5s ease; }
+#s13-grounded.show { opacity: 1; }
+#s13-grounded .hl { color: var(--accent); }
+
+/* ─── SCENE 14 ─────────────────────────────────────────────────────────────── */
+#s14-metrics { width: 560px; }
+.s14-metric-line { display: flex; align-items: baseline; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; opacity: 0; transition: opacity 0.5s ease; }
+.s14-metric-line.show { opacity: 1; }
+.s14-check { font-size: 16px; color: var(--matched); width: 22px; flex-shrink: 0; }
+.s14-num { font-size: 30px; font-weight: 700; color: var(--matched); width: 175px; text-align: right; flex-shrink: 0; }
+.s14-label { font-size: 13px; color: var(--ink-2); letter-spacing: 0.04em; font-family: 'Inter', sans-serif; }
+
+/* ─── SCENE 15 ─────────────────────────────────────────────────────────────── */
+#s15-verbs { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 44px; }
+.s15-verb { font-size: 52px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0; transition: opacity 0.6s ease, transform 0.6s ease; transform: translateY(12px); }
+.s15-verb.show { opacity: 1; transform: translateY(0); }
+#s15-logo-block { text-align: center; opacity: 0; transition: opacity 1.2s ease; }
+#s15-logo-block.show { opacity: 1; }
+#s15-logo-main { font-size: 48px; font-weight: 900; letter-spacing: 0.06em; color: var(--ink); margin-bottom: 10px; }
+#s15-logo-sub { font-size: 18px; color: var(--ink-3); letter-spacing: 0.04em; margin-bottom: 14px; font-weight: 400; }
+#s15-tagline { font-style: italic; font-size: 16px; color: var(--ink-2); letter-spacing: 0.02em; }
+#s15-final-caption { margin-top: 30px; font-size: 15px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink-3); text-transform: uppercase; opacity: 0; transition: opacity 1s ease; text-align: center; }
+#s15-final-caption.show { opacity: 1; }
+.s15-dot { color: var(--accent); margin: 0 8px; }
+</style>
+</head>
+<body>
+
+<!-- HUD -->
+<div id="hud">
+  <span id="hud-scene">Scene 1 / 15</span>
+  <span id="hud-timer">0:00</span>
+  <span id="hud-state">PLAYING</span>
+</div>
+
+<!-- Keyboard hint -->
+<div id="keyhint">SPACE pause &nbsp;·&nbsp; &#8592; prev &nbsp;·&nbsp; &#8594; next</div>
+
+<!-- Scene container -->
+<div id="scene-container"></div>
+
+<!-- Progress bar -->
+<div id="progress-container">
+  <div id="progress-bar"></div>
+</div>
+
+<!-- Voiceover caption -->
+<div id="caption"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   RECONGUARD DEMO PRESENTATION ENGINE
+   Vanilla JS. No frameworks. Clean code for judge inspection.
+═══════════════════════════════════════════════════════════════════════════ */
+
+// ─── State ───────────────────────────────────────────────────────────────────
+const state = {
+  currentScene: 0,
+  paused: false,
+  totalElapsed: 0,
+  sceneElapsed: 0,
+  animationTimers: [],
+  sceneTimeout: null,
+};
+
+// ─── Scene durations (seconds) ────────────────────────────────────────────────
+const SCENE_DURATIONS = [20, 15, 15, 20, 25, 15, 20, 25, 20, 20, 40, 30, 25, 15, 15];
+
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
+const container   = document.getElementById('scene-container');
+const progressBar = document.getElementById('progress-bar');
+const captionEl   = document.getElementById('caption');
+const hudScene    = document.getElementById('hud-scene');
+const hudTimer    = document.getElementById('hud-timer');
+const hudState    = document.getElementById('hud-state');
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+function clearTimers() {
+  state.animationTimers.forEach(t => clearTimeout(t));
+  state.animationTimers = [];
+}
+
+function later(fn, ms) {
+  const t = setTimeout(fn, Math.max(0, ms));
+  state.animationTimers.push(t);
+  return t;
+}
+
+function show(id, delay) {
+  later(() => {
+    const el = typeof id === 'string' ? document.getElementById(id) : id;
+    if (el) el.classList.add('show');
+  }, delay || 0);
+}
+
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  return m + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+}
+
+// ─── Progress & HUD update ────────────────────────────────────────────────────
+setInterval(() => {
+  if (state.paused) return;
+  state.sceneElapsed += 0.1;
+  state.totalElapsed += 0.1;
+  const pct = Math.min((state.sceneElapsed / SCENE_DURATIONS[state.currentScene]) * 100, 100);
+  progressBar.style.width = pct + '%';
+  hudTimer.textContent = fmtTime(state.totalElapsed);
+}, 100);
+
+// ─── Scene mounting ───────────────────────────────────────────────────────────
+function mountScene(index) {
+  container.innerHTML = '';
+  clearTimers();
+
+  const cfg = SCENES[index];
+  if (!cfg) return;
+
+  const sceneEl = document.createElement('div');
+  sceneEl.className = 'scene';
+  container.appendChild(sceneEl);
+  cfg.render(sceneEl);
+
+  requestAnimationFrame(() => requestAnimationFrame(() => sceneEl.classList.add('active')));
+
+  captionEl.textContent = cfg.voiceover || '';
+  captionEl.classList.remove('visible');
+  later(() => captionEl.classList.add('visible'), 800);
+  hudScene.textContent = 'Scene ' + (index + 1) + ' / 15';
+}
+
+function goToScene(index) {
+  if (index < 0 || index >= SCENES.length) return;
+  const cur = container.querySelector('.scene.active');
+  if (cur) cur.classList.remove('active');
+  if (state.sceneTimeout) clearTimeout(state.sceneTimeout);
+
+  state.currentScene = index;
+  state.sceneElapsed = 0;
+
+  later(() => {
+    mountScene(index);
+    scheduleNext();
+  }, 600);
+}
+
+function scheduleNext() {
+  if (state.sceneTimeout) clearTimeout(state.sceneTimeout);
+  const dur = SCENE_DURATIONS[state.currentScene] * 1000;
+  state.sceneTimeout = setTimeout(() => {
+    if (!state.paused && state.currentScene < SCENES.length - 1) goToScene(state.currentScene + 1);
+  }, dur);
+}
+
+// ─── Keyboard ─────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    state.paused = !state.paused;
+    hudState.textContent = state.paused ? 'PAUSED' : 'PLAYING';
+    if (!state.paused) scheduleNext();
+    else clearTimeout(state.sceneTimeout);
+  }
+  if (e.code === 'ArrowRight') goToScene(state.currentScene + 1);
+  if (e.code === 'ArrowLeft')  goToScene(state.currentScene - 1);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCENE DEFINITIONS
+═══════════════════════════════════════════════════════════════════════════ */
+const SCENES = [];
+
+// ─── S1: THE FINANCE PROBLEM ──────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Finance teams don't reconcile one clean ledger.",
+  render(el) {
+    el.innerHTML = `
+      <div style="text-align:center;width:100%;max-width:780px;">
+        <div class="scene-title">The Reality of Finance Operations</div>
+        <div id="s1-sources">
+          <span class="s1-source" id="ss0">ORDERS</span><span class="s1-dot">&nbsp;·&nbsp;</span>
+          <span class="s1-source" id="ss1">PAYMENTS</span><span class="s1-dot">&nbsp;·&nbsp;</span>
+          <span class="s1-source" id="ss2">GATEWAY SETTLEMENTS</span><span class="s1-dot">&nbsp;·&nbsp;</span>
+          <span class="s1-source" id="ss3">BANK STATEMENTS</span><span class="s1-dot">&nbsp;·&nbsp;</span>
+          <span class="s1-source" id="ss4">INVOICES</span><span class="s1-dot">&nbsp;·&nbsp;</span>
+          <span class="s1-source" id="ss5">REFUNDS</span><span class="s1-dot">&nbsp;·&nbsp;</span>
+          <span class="s1-source" id="ss6">TAX RECORDS</span>
+        </div>
+        <div id="s1-chaos">
+          <span class="chaos-line" id="c0" style="top:8px;left:10px;color:var(--exception)">RZP PAYOUT 2841 DUPLICATE</span>
+          <span class="chaos-line" id="c1" style="top:42px;left:170px;color:var(--accent)">MISMATCH −₹200</span>
+          <span class="chaos-line" id="c2" style="top:78px;left:55px;color:var(--unresolved)">DELAYED +3d</span>
+          <span class="chaos-line" id="c3" style="top:16px;left:370px;color:var(--ink-3)">INV/2841/ACCT PGWX 99102...</span>
+          <span class="chaos-line" id="c4" style="top:95px;left:290px;color:var(--ink-3)">UNKNOWN_REF_FORMAT</span>
+          <span class="chaos-line" id="c5" style="top:128px;left:110px;color:var(--exception)">CHARGEBACK</span>
+          <span class="chaos-line" id="c6" style="top:52px;left:510px;color:var(--ink-3)">ACH CR//PGWX/99102/...</span>
+          <span class="chaos-line" id="c7" style="top:150px;left:340px;color:var(--accent)">AMT_DISCREPANCY ₹36</span>
+          <span class="chaos-line" id="c8" style="top:8px;left:590px;color:var(--unresolved)">NEFT TRF 2841 RGWX</span>
+        </div>
+        <div id="s1-pipeline">
+          <div class="s1-arrow-label">MESSY FINANCIAL DATA</div>
+          <div class="s1-down-arrow">↓</div>
+          <div class="s1-arrow-label" style="color:var(--accent)">ONE CONTROLLED PIPELINE</div>
+        </div>
+        <div id="s1-logo"><span style="margin-right:10px">🛡️</span><span style="color:var(--accent)">RECON</span>GUARD</div>
+      </div>`;
+
+    for (let i = 0; i <= 6; i++) later(() => document.getElementById('ss' + i)?.classList.add('visible'), i * 280);
+    for (let i = 0; i <= 8; i++) later(() => document.getElementById('c' + i)?.classList.add('visible'), 400 + i * 330);
+
+    later(() => {
+      ['s1-chaos','s1-sources'].forEach(id => { const e = document.getElementById(id); if (e) e.style.opacity = '0'; });
+      later(() => { const p = document.getElementById('s1-pipeline'); if (p) p.classList.add('visible'); }, 600);
+      later(() => { const l = document.getElementById('s1-logo'); if (l) l.classList.add('visible'); }, 1400);
+    }, 8000);
+  }
+});
+
+// ─── S2: DATA INGESTION ───────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "ReconGuard loads multiple financial sources into one controlled pipeline.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">Data Ingestion — Multiple Sources, One Pipeline</div>
+      <div id="s2-shell">
+        <div id="s2-sidebar">
+          <div class="s2-nav active">Overview</div>
+          <div class="s2-nav">Reconciliation</div>
+          <div class="s2-nav">Exceptions</div>
+          <div class="s2-nav">Audit Trail</div>
+          <div class="s2-nav">Journal</div>
+          <div class="s2-nav">Rules</div>
+          <div class="s2-nav">Cash Position</div>
+          <div class="s2-nav">Copilot</div>
+        </div>
+        <div id="s2-main">
+          <div id="s2-main-title">Overview</div>
+          <div id="s2-empty-state">
+            <div class="s2-empty-icon">📊</div>
+            <div class="s2-empty-text">No reconciliation data yet</div>
+            <button id="s2-run-btn">▶ Run Reconciliation</button>
+          </div>
+          <div id="s2-stats">
+            <div id="s2-counter">0</div>
+            <div id="s2-counter-label">Records Loaded</div>
+            <div class="s2-stat-row" id="s2-stat-chips"></div>
+            <div class="s2-stat-row" id="s2-source-badges"></div>
+          </div>
+        </div>
+      </div>`;
+
+    later(() => {
+      const btn = document.getElementById('s2-run-btn');
+      if (btn) {
+        btn.classList.add('clicked');
+        later(() => {
+          const empty = document.getElementById('s2-empty-state');
+          const stats = document.getElementById('s2-stats');
+          const counter = document.getElementById('s2-counter');
+          const counterLabel = document.getElementById('s2-counter-label');
+          if (empty) empty.style.display = 'none';
+          if (stats) stats.classList.add('visible');
+          if (counter) counter.classList.add('visible');
+          if (counterLabel) counterLabel.classList.add('visible');
+
+          let count = 0;
+          const iv = setInterval(() => {
+            count = Math.min(count + 14, 500);
+            if (counter) counter.textContent = count;
+            if (count >= 500) clearInterval(iv);
+          }, 40);
+
+          const chips = document.getElementById('s2-stat-chips');
+          ['500 RECORDS', '4 DATA SOURCES', '1 RUN'].forEach((text, i) => {
+            const c = document.createElement('div');
+            c.className = 's2-stat-chip';
+            c.textContent = text;
+            if (chips) chips.appendChild(c);
+            later(() => c.classList.add('show'), 200 + i * 280);
+          });
+
+          const badges = document.getElementById('s2-source-badges');
+          ['Orders', 'Payment Gateway', 'Bank Statements', 'Invoices'].forEach((text, i) => {
+            const b = document.createElement('div');
+            b.className = 's2-source-badge';
+            b.textContent = text;
+            if (badges) badges.appendChild(b);
+            later(() => b.classList.add('show'), 700 + i * 230);
+          });
+        }, 400);
+      }
+    }, 2200);
+  }
+});
+
+// ─── S3: NORMALIZATION ────────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Raw records are normalized while original source evidence is preserved.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">Normalization Engine — Structure from Chaos</div>
+      <div id="s3-cols">
+        <div class="s3-col">
+          <div class="s3-col-label text-exception">RAW</div>
+          <div class="s3-raw-line" id="r0">RAZORPAY PAYOUT INV/2841/ACCT</div>
+          <div class="s3-raw-line" id="r1">ACH CR//PGWX/99102/MERCHANT</div>
+          <div class="s3-raw-line" id="r2">NEFT TRF 2841 RGWX</div>
+        </div>
+        <div class="s3-arrow-col">→</div>
+        <div class="s3-col">
+          <div class="s3-col-label text-matched">NORMALIZED</div>
+          <div class="s3-norm-card" id="n0">
+            <div class="s3-norm-field"><span class="k">reference: </span><span class="v">INV-2841</span></div>
+            <div class="s3-norm-field"><span class="k">date:      </span><span class="v">2026-09-04</span></div>
+            <div class="s3-norm-field"><span class="k">amount:    </span><span class="v">₹12,450</span></div>
+            <div class="s3-original">Original preserved: "RAZORPAY PAYOUT INV/2841/ACCT"</div>
+          </div>
+          <div class="s3-norm-card" id="n1">
+            <div class="s3-norm-field"><span class="k">reference: </span><span class="v">PGWX-99102</span></div>
+            <div class="s3-norm-field"><span class="k">date:      </span><span class="v">2026-09-03</span></div>
+            <div class="s3-norm-field"><span class="k">amount:    </span><span class="v">₹8,200</span></div>
+            <div class="s3-original">Original preserved: "ACH CR//PGWX/99102/MERCHANT"</div>
+          </div>
+          <div class="s3-norm-card" id="n2">
+            <div class="s3-norm-field"><span class="k">reference: </span><span class="v">INV-2841</span></div>
+            <div class="s3-norm-field"><span class="k">date:      </span><span class="v">2026-09-03</span></div>
+            <div class="s3-norm-field"><span class="k">amount:    </span><span class="v">₹12,450</span></div>
+            <div class="s3-original">Original preserved: "NEFT TRF 2841 RGWX"</div>
+          </div>
+        </div>
+      </div>`;
+
+    [0,1,2].forEach(i => {
+      later(() => document.getElementById('r' + i)?.classList.add('show'), 500 + i * 1400);
+      later(() => document.getElementById('n' + i)?.classList.add('show'), 950 + i * 1400);
+    });
+  }
+});
+
+// ─── S4: ACCOUNTING ENGINE ────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Settlements are calculated deterministically. All money is integer paise.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">Accounting Engine — Deterministic Settlement Calculation</div>
+      <div id="s4-drawer">
+        <div id="s4-drawer-header">
+          <span class="mono" style="font-size:15px;font-weight:700;color:var(--ink);">RECON-000041</span>
+          <span class="chip chip-matched">MATCHED</span>
+        </div>
+        <div id="s4-r0" class="s4-calc-row"><span class="label">Gross Payment</span><span class="val">₹10,000.00</span></div>
+        <div id="s4-r1" class="s4-calc-row"><span class="label">Gateway Fee (2%)</span><span class="neg">−₹200.00</span></div>
+        <div id="s4-r2" class="s4-calc-row"><span class="label">GST on Fee (18%)</span><span class="neg">−₹36.00</span></div>
+        <div id="s4-r3" class="s4-calc-row"><span class="label">TDS (0.10%)</span><span class="neg">−₹10.00</span></div>
+        <div id="s4-r4" class="s4-calc-row"><span class="label">Refund</span><span class="val">₹0.00</span></div>
+        <div id="s4-div" class="s4-divider-row">──────────────────────────────────────────────────</div>
+        <div id="s4-exp" class="s4-total-row"><span>Expected Settlement</span><span>₹9,754.00</span></div>
+        <div id="s4-act" class="s4-total-row" style="color:var(--matched)"><span>Actual Settlement</span><span>₹9,754.00</span></div>
+        <div id="s4-bal" class="s4-balance">
+          <span class="s4-balance-mark">✓</span>
+          <span class="s4-balance-text">BALANCED</span>
+        </div>
+        <div id="s4-meta" class="s4-meta">
+          <span class="s4-meta-item">Confidence: <span class="val">1.00</span></span>
+          <span class="s4-meta-item" style="color:var(--line-strong)">·</span>
+          <span class="s4-meta-item">Match type: <span class="val">ACCOUNTING INVARIANT</span></span>
+          <span class="chip chip-accent" style="margin-left:auto;font-size:10px;">INTEGER PAISE · ₹0.01 PRECISION</span>
+        </div>
+      </div>`;
+
+    [0,1,2,3,4].forEach(i => later(() => document.getElementById('s4-r' + i)?.classList.add('show'), 500 + i * 480));
+    later(() => document.getElementById('s4-div')?.classList.add('show'), 3000);
+    later(() => document.getElementById('s4-exp')?.classList.add('show'), 3500);
+    later(() => document.getElementById('s4-act')?.classList.add('show'), 4200);
+    later(() => document.getElementById('s4-bal')?.classList.add('show'), 5000);
+    later(() => document.getElementById('s4-meta')?.classList.add('show'), 5800);
+  }
+});
+
+// ─── S5: RECONCILIATION ENGINE ────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Five deterministic layers. If evidence is insufficient, it becomes an exception.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">Reconciliation Engine — Five Deterministic Layers</div>
+      <div id="s5-content">
+        <div id="s5-progress-wrap">
+          <div id="s5-progress-track"><div id="s5-progress-fill"></div></div>
+          <div id="s5-progress-label">Running reconciliation...</div>
+        </div>
+        <div id="s5-run-stats">504 RECORDS &nbsp;·&nbsp; 53ms</div>
+        <div id="s5-l0" class="s5-layer"><div class="s5-layer-num">[1]</div><div class="s5-layer-name">EXACT IDENTIFIERS</div><div class="s5-layer-count">387 matched</div><div class="s5-layer-check">✓</div></div>
+        <div id="s5-l1" class="s5-layer"><div class="s5-layer-num">[2]</div><div class="s5-layer-name">ACCOUNTING INVARIANTS</div><div class="s5-layer-count">62 matched</div><div class="s5-layer-check">✓</div></div>
+        <div id="s5-l2" class="s5-layer"><div class="s5-layer-num">[3]</div><div class="s5-layer-name">AMOUNT + DATE WINDOW</div><div class="s5-layer-count">8 matched</div><div class="s5-layer-check">✓</div></div>
+        <div id="s5-l3" class="s5-layer"><div class="s5-layer-num">[4]</div><div class="s5-layer-name">N:M AGGREGATION</div><div class="s5-layer-count">8 matched</div><div class="s5-layer-check">✓</div></div>
+        <div id="s5-l4" class="s5-layer"><div class="s5-layer-num">[5]</div><div class="s5-layer-name">NETTING</div><div class="s5-layer-count">4 matched</div><div class="s5-layer-check">✓</div></div>
+        <div id="s5-exception-row">
+          <span class="chip chip-exception" style="font-size:10px;">EXCEPTION</span>
+          <span class="s5-exc-id">RECON-000198</span>
+          <span class="s5-exc-reason">&nbsp;·&nbsp; INSUFFICIENT EVIDENCE</span>
+        </div>
+        <div id="s5-statement">THE ENGINE DOES NOT GUESS.</div>
+      </div>`;
+
+    later(() => {
+      document.getElementById('s5-progress-wrap')?.classList.add('show');
+      later(() => { const f = document.getElementById('s5-progress-fill'); if(f) f.style.width = '100%'; }, 200);
+    }, 300);
+    later(() => document.getElementById('s5-run-stats')?.classList.add('show'), 2700);
+
+    for (let i = 0; i < 5; i++) {
+      later(() => {
+        const l = document.getElementById('s5-l' + i);
+        l?.classList.add('show');
+        later(() => l?.classList.add('lit'), 500);
+      }, 3300 + i * 1150);
+    }
+    later(() => document.getElementById('s5-exception-row')?.classList.add('show'), 9500);
+    later(() => document.getElementById('s5-statement')?.classList.add('show'), 11200);
+  }
+});
+
+// ─── S6: OVERVIEW METRICS ─────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Every metric comes directly from the reconciliation run.",
+  render(el) {
+    const metrics = [
+      { label:'TOTAL TRANSACTIONS', val:'504',       cls:'' },
+      { label:'MATCH RATE',         val:'93.06%',    cls:'green' },
+      { label:'DET. MATCHES',       val:'469',       cls:'' },
+      { label:'EXCEPTIONS',         val:'29',        cls:'' },
+      { label:'PROCESSING TIME',    val:'53ms',      cls:'' },
+      { label:'THROUGHPUT',         val:'~9,700/s',  cls:'' },
+      { label:'RECONCILED',         val:'₹2.13Cr',   cls:'' },
+      { label:'UNEXPLAINED',        val:'₹61,592',   cls:'' },
+    ];
+    const distRows = [
+      { name:'Matched',   count:469, pct:'93.1%', color:'var(--matched)',   bar:93   },
+      { name:'Partial',   count:12,  pct:'2.4%',  color:'var(--partial)',   bar:2.4  },
+      { name:'Review',    count:11,  pct:'2.2%',  color:'var(--review)',    bar:2.2  },
+      { name:'Duplicate', count:8,   pct:'1.6%',  color:'var(--duplicate)', bar:1.6  },
+      { name:'Exception', count:16,  pct:'3.2%',  color:'var(--exception)', bar:3.2  },
+    ];
+
+    let gHTML = '<div id="s6-grid">';
+    metrics.forEach((m,i) => { gHTML += `<div class="s6-metric" id="s6m${i}"><div class="s6-metric-label">${m.label}</div><div class="s6-metric-value ${m.cls}">${m.val}</div></div>`; });
+    gHTML += '</div>';
+
+    let dHTML = '<div id="s6-dist">';
+    distRows.forEach((r,i) => { dHTML += `<div class="s6-dist-row" id="s6d${i}"><div class="s6-dist-name">${r.name}</div><div class="s6-dist-count">${r.count}</div><div class="s6-dist-bar-wrap"><div class="s6-dist-bar" id="s6db${i}" style="background:${r.color}"></div></div><div class="s6-dist-pct">${r.pct}</div></div>`; });
+    dHTML += '</div>';
+
+    el.innerHTML = `<div class="scene-title">Live Run Metrics</div>${gHTML}${dHTML}<div id="s6-banner">LIVE RUN METRICS — NOT DECORATIVE STATISTICS</div>`;
+
+    metrics.forEach((_,i) => later(() => document.getElementById('s6m' + i)?.classList.add('show'), 250 + i * 190));
+    distRows.forEach((_,i) => {
+      later(() => {
+        document.getElementById('s6d' + i)?.classList.add('show');
+        later(() => { const b = document.getElementById('s6db' + i); if (b) b.style.width = distRows[i].bar + '%'; }, 200);
+      }, 2100 + i * 280);
+    });
+    later(() => document.getElementById('s6-banner')?.classList.add('show'), 4000);
+  }
+});
+
+// ─── S7: EXCEPTIONS ───────────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "ReconGuard doesn't hide failure. Every unresolved item is explicit.",
+  render(el) {
+    const rows = [
+      { id:'RECON-000198', party:'UNKNOWN_BANK_CREDIT', reason:'No matching order',   exp:'₹24,800', cls:'exception' },
+      { id:'RECON-000204', party:'MISSING_SETTLEMENT',  reason:'Settlement absent',   exp:'₹18,400', cls:'exception' },
+      { id:'RECON-000211', party:'DUPLICATE_PAYMENT',   reason:'Duplicate detected',  exp:'₹9,200',  cls:'duplicate' },
+      { id:'RECON-000219', party:'PARTIAL_MATCH',       reason:'Amount variance',     exp:'₹4,600',  cls:'partial' },
+      { id:'RECON-000225', party:'DELAYED_SETTLEMENT',  reason:'+5d delay',            exp:'₹3,100',  cls:'review' },
+    ];
+
+    let tHTML = `<div id="s7-layout"><div id="s7-table-wrap"><div class="s7-col-heads"><div class="s7-th">Status</div><div class="s7-th">Recon ID</div><div class="s7-th">Counterparty</div><div class="s7-th">Reason</div><div class="s7-th-exp">Exposure</div></div>`;
+    rows.forEach((r,i) => { tHTML += `<div class="s7-row${i===0?' selected':''}" id="s7r${i}"><div class="s7-cell"><span class="chip chip-${r.cls}" style="font-size:10px;">${r.cls.toUpperCase()}</span></div><div class="s7-cell mono" style="font-size:12px;color:var(--ink)">${r.id}</div><div class="s7-cell" style="font-size:12px;">${r.party}</div><div class="s7-cell" style="font-size:12px;color:var(--ink-3)">${r.reason}</div><div class="s7-cell-exp" style="color:var(--exception)">${r.exp}</div></div>`; });
+    tHTML += `</div><div id="s7-drawer"><div class="s7-drawer-title">Exception Detail</div><div class="s7-drawer-row"><span class="s7-drawer-key">Bank TXN</span><span class="s7-drawer-val">BANK-TXN-0198</span></div><div class="s7-drawer-row"><span class="s7-drawer-key">Amount</span><span class="s7-drawer-val">₹24,800</span></div><div class="s7-drawer-row"><span class="s7-drawer-key">Date</span><span class="s7-drawer-val">2026-08-15</span></div><div class="s7-drawer-row"><span class="s7-drawer-key">Reason</span><span class="s7-drawer-val" style="color:var(--exception)">UNKNOWN_BANK_CREDIT</span></div><div class="s7-drawer-row"><span class="s7-drawer-key">Candidates</span><span class="s7-drawer-val">3 reviewed · 0 confirmed</span></div><div class="s7-drawer-row"><span class="s7-drawer-key">Status</span><span class="s7-drawer-val" style="color:var(--accent)">REVIEW REQUIRED</span></div><div id="s7-overlay">EVERY EXCEPTION:<br>REASON + EXPOSURE + EVIDENCE</div></div></div>`;
+
+    el.innerHTML = `<div class="scene-title">Exception Management</div>${tHTML}`;
+
+    rows.forEach((_,i) => later(() => document.getElementById('s7r' + i)?.classList.add('show'), 300 + i * 380));
+    later(() => document.getElementById('s7-drawer')?.classList.add('show'), 2200);
+    later(() => document.getElementById('s7-overlay')?.classList.add('show'), 3600);
+  }
+});
+
+// ─── S8: AI ARBITRATOR ────────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Only residuals reach AI. It does not calculate the books.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">AI Arbitrator — Residual-Only Resolution</div>
+      <div id="s8-pipeline">
+        <div class="s8-box s8-box-green"><div class="s8-box-label" style="color:var(--matched)">DETERMINISTIC<br>ENGINE</div></div>
+        <div class="s8-connector">──→</div>
+        <div class="s8-box s8-box-green"><div class="s8-box-label" style="color:var(--matched)">UNRESOLVED<br>RESIDUAL</div></div>
+        <div class="s8-connector">──→</div>
+        <div class="s8-box s8-box-amber"><div class="s8-box-label" style="color:var(--accent)">AI<br>ARBITRATOR</div></div>
+      </div>
+      <div id="s8-proposal">
+        <div id="s8-proposal-header">AI Arbitration Proposal</div>
+        <div id="s8-proposal-body">
+          <div class="s8-prop-row"><span class="s8-prop-key">Candidate:</span><span class="s8-prop-val">SETTLEMENT-1042</span></div>
+          <div class="s8-prop-row"><span class="s8-prop-key">Decision:</span><span class="s8-prop-val" style="color:var(--matched);font-weight:700">RESOLVE</span></div>
+          <div class="s8-prop-row"><span class="s8-prop-key">Confidence:</span><span class="s8-prop-val" style="color:var(--accent)">0.87</span></div>
+          <div class="s8-prop-row"><span class="s8-prop-key">Evidence:</span><span class="s8-prop-val" style="color:var(--ink-3)">PAY-2841<br>INV-2841<br>BANK-TXN-0198</span></div>
+        </div>
+      </div>
+      <div id="s8-providers">
+        <span class="chip chip-matched">Gemini</span>
+        <span class="chip chip-partial">OpenAI</span>
+        <span class="chip chip-muted">Anthropic</span>
+      </div>
+      <div id="s8-fallback">NO API KEY → DETERMINISTIC FALLBACK</div>
+      <div id="s8-statement">AI OPERATES ONLY ON UNRESOLVED RESIDUALS</div>`;
+
+    later(() => document.getElementById('s8-pipeline')?.classList.add('show'), 400);
+    later(() => document.getElementById('s8-proposal')?.classList.add('show'), 2100);
+    later(() => document.getElementById('s8-providers')?.classList.add('show'), 4200);
+    later(() => document.getElementById('s8-fallback')?.classList.add('show'), 4900);
+    later(() => document.getElementById('s8-statement')?.classList.add('show'), 5800);
+  }
+});
+
+// ─── S9: VERIFICATION GATE ────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Every AI suggestion passes through a deterministic verification gate.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">Verification Gate — <span class="accent">AI Proposes. System Verifies.</span></div>
+      <div id="s9-content">
+        <div class="s9-section-label">AI PROPOSAL RECEIVED</div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:8px 0 10px">
+        <div class="s9-check-item pass" id="s9c0"><span class="s9-mark">✓</span>RECORD EXISTS</div>
+        <div class="s9-check-item pass" id="s9c1"><span class="s9-mark">✓</span>AMOUNT AGREES WITH STORED FACT</div>
+        <div class="s9-check-item pass" id="s9c2"><span class="s9-mark">✓</span>EVIDENCE IS VALID</div>
+        <div class="s9-check-item pass" id="s9c3"><span class="s9-mark">✓</span>ACTION IS PERMITTED</div>
+        <div class="s9-check-item pass" id="s9c4"><span class="s9-mark">✓</span>JOURNAL BALANCES</div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:10px 0 8px">
+        <div class="s9-result pass" id="s9r0"><span>✓</span>VERIFIED — PROPOSAL ACCEPTED</div>
+        <div id="s9-failed-case">
+          <hr style="border:none;border-top:1px solid var(--line-strong);margin:14px 0 10px">
+          <div class="s9-section-label" style="color:var(--exception)">FAILED CASE</div>
+          <div class="s9-check-item fail" id="s9fc"><span class="s9-mark" style="color:var(--exception)">✗</span>RECORD ID DOES NOT EXIST</div>
+          <hr style="border:none;border-top:1px solid var(--line);margin:8px 0 8px">
+          <div class="s9-result fail" id="s9fr"><span>✗</span>REJECTED — AI DOES NOT WIN</div>
+        </div>
+        <div id="s9-grand">AI PROPOSES.&nbsp;&nbsp;&nbsp;DETERMINISTIC SYSTEM VERIFIES.</div>
+      </div>`;
+
+    [0,1,2,3,4].forEach(i => later(() => document.getElementById('s9c' + i)?.classList.add('show'), 600 + i * 700));
+    later(() => document.getElementById('s9r0')?.classList.add('show'), 4300);
+    later(() => {
+      document.getElementById('s9-failed-case')?.classList.add('show');
+      later(() => document.getElementById('s9fc')?.classList.add('show'), 300);
+      later(() => document.getElementById('s9fr')?.classList.add('show'), 800);
+    }, 10000);
+    later(() => document.getElementById('s9-grand')?.classList.add('show'), 12600);
+  }
+});
+
+// ─── S10: JOURNAL + HUMAN APPROVAL ───────────────────────────────────────────
+SCENES.push({
+  voiceover: "Even AI-proposed bookkeeping requires human sign-off.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">Journal Entry — Human Approval Required</div>
+      <div id="s10-card">
+        <div id="s10-card-header">Proposed Journal Entry</div>
+        <div id="s10-card-body">
+          <div style="border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px">
+            <div class="s10-journal-row"><span><span class="s10-dr">Dr</span><span class="s10-acct">Accounts Receivable</span></span><span class="s10-amt">₹24,800.00</span></div>
+            <div class="s10-journal-row"><span><span class="s10-cr">Cr</span><span class="s10-acct">Settlement Receivable</span></span><span class="s10-amt">₹24,800.00</span></div>
+          </div>
+          <div class="s10-meta">
+            <div class="s10-meta-row"><span class="s10-meta-key">Status</span><span id="s10sc"><span class="chip chip-accent">PENDING HUMAN APPROVAL</span></span></div>
+            <div class="s10-meta-row"><span class="s10-meta-key">Proposed by</span><span class="s10-meta-val">deterministic-arbitrator</span></div>
+            <div class="s10-meta-row"><span class="s10-meta-key">Actor required</span><span class="s10-meta-val">finance@company.com</span></div>
+          </div>
+          <div id="s10-buttons">
+            <button class="s10-btn s10-btn-approve" id="s10ab">✓ Approve</button>
+            <button class="s10-btn s10-btn-reject">✗ Reject</button>
+          </div>
+          <div id="s10-confirm">
+            <span class="chip chip-matched">✓ BALANCED</span>
+            <span class="chip chip-matched">✓ HUMAN APPROVED</span>
+            <span class="chip chip-matched">✓ POSTED</span>
+          </div>
+        </div>
+      </div>
+      <div id="s10-statement">NO ACCOUNTING ENTRY IS POSTED WITHOUT HUMAN APPROVAL</div>`;
+
+    later(() => document.getElementById('s10-card')?.classList.add('show'), 500);
+    later(() => {
+      const btn = document.getElementById('s10ab');
+      if (btn) btn.style.opacity = '0.5';
+      later(() => {
+        const sc = document.getElementById('s10sc');
+        if (sc) sc.innerHTML = '<span class="chip chip-review">APPROVING...</span>';
+        later(() => {
+          if (sc) sc.innerHTML = '<span class="chip chip-matched">APPROVED → POSTED</span>';
+          document.getElementById('s10-confirm')?.classList.add('show');
+        }, 1200);
+      }, 400);
+    }, 6500);
+    later(() => document.getElementById('s10-statement')?.classList.add('show'), 9200);
+  }
+});
+
+// ─── S11: SELF-HEALING RULES ──────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "When patterns recur, the system proposes a deterministic rule — validated before activation.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">Self-Healing Rules — <span class="accent">Learn → Backtest → Approve → Automate</span></div>
+      <div id="s11-content">
+        <div id="s11-rule-card">
+          <div id="s11-rule-header">
+            <span class="s11-rule-id">RULE-DYN-001</span>
+            <span class="chip chip-review" id="s11sc">CANDIDATE</span>
+          </div>
+          <div class="s11-rule-field"><span class="s11-rule-key">Pattern</span><span class="s11-rule-val">PGWX\s+99(\d{5})</span></div>
+          <div class="s11-rule-field"><span class="s11-rule-key">Triggered by</span><span class="s11-rule-val">6 recurring exceptions · Gateway narration format mismatch</span></div>
+          <div class="s11-rule-field"><span class="s11-rule-key">Status</span><span class="s11-rule-val" style="color:var(--accent)">CANDIDATE — awaiting validation</span></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:10px">
+          <button id="s11-validate-btn" class="s11-action-btn show">Validate Rule</button>
+          <button id="s11-approve-btn" class="s11-action-btn">Approve Rule</button>
+        </div>
+        <div id="s11-replay">
+          <div id="s11-replay-track"><div id="s11-replay-fill"></div></div>
+          <div id="s11-replay-label">REPLAYING AGAINST HISTORICAL DATA...</div>
+        </div>
+        <div id="s11-results">
+          <div class="s11-result-row">✓&nbsp; Additional matches: +6</div>
+          <div class="s11-result-row">✓&nbsp; Regressions: 0</div>
+          <div class="s11-result-row">✓&nbsp; False positives: 0</div>
+          <div class="s11-result-row">✓&nbsp; VALIDATION PASSED</div>
+        </div>
+        <div id="s11-compare">
+          <div class="s11-compare-box">
+            <div class="s11-compare-label">Before</div>
+            <div class="s11-compare-val">90.78%</div>
+            <div class="s11-compare-sub">35 residuals</div>
+          </div>
+          <div class="s11-compare-box after">
+            <div class="s11-compare-label">After</div>
+            <div class="s11-compare-val" style="color:var(--matched)">93.06%</div>
+            <div class="s11-compare-sub">29 residuals</div>
+            <div class="s11-compare-delta">+6 matches · 0 regressions · +2.27pp</div>
+          </div>
+        </div>
+        <div id="s11-ai-bar">
+          <div class="s11-ai-label">AI Dependency Reduction</div>
+          <div class="s11-ai-track-wrap">
+            <span class="s11-ai-tag">BEFORE</span>
+            <div class="s11-ai-track"><div class="s11-ai-fill before" id="s11bf"></div></div>
+            <span class="s11-ai-pct">100%</span>
+          </div>
+          <div class="s11-ai-track-wrap">
+            <span class="s11-ai-tag">AFTER</span>
+            <div class="s11-ai-track"><div class="s11-ai-fill after" id="s11af"></div></div>
+            <span class="s11-ai-pct" style="color:var(--matched)">42.9%</span>
+          </div>
+          <div id="s11-reduction">57.1% AI DEPENDENCY REDUCTION</div>
+        </div>
+        <div id="s11-flow"><span class="accent">LEARN</span> → <span class="accent">BACKTEST</span> → <span class="accent">APPROVE</span> → <span class="accent">AUTOMATE</span></div>
+      </div>`;
+
+    later(() => document.getElementById('s11-rule-card')?.classList.add('show'), 400);
+
+    // Validate click
+    later(() => {
+      const vb = document.getElementById('s11-validate-btn');
+      if (vb) vb.style.opacity = '0.45';
+      later(() => {
+        document.getElementById('s11-replay')?.classList.add('show');
+        later(() => { const f = document.getElementById('s11-replay-fill'); if(f) f.style.width = '100%'; }, 200);
+        later(() => document.getElementById('s11-results')?.classList.add('show'), 1800);
+      }, 500);
+    }, 3500);
+
+    // Approve click
+    later(() => {
+      document.getElementById('s11-approve-btn')?.classList.add('show');
+      later(() => {
+        const ab = document.getElementById('s11-approve-btn');
+        if (ab) ab.style.opacity = '0.45';
+        const chip = document.getElementById('s11sc');
+        if (chip) {
+          chip.className = 'chip chip-partial';
+          chip.textContent = 'APPROVED';
+          later(() => { chip.className = 'chip chip-matched'; chip.textContent = 'ACTIVE'; }, 800);
+        }
+      }, 600);
+    }, 6800);
+
+    later(() => document.getElementById('s11-compare')?.classList.add('show'), 9000);
+    later(() => {
+      document.getElementById('s11-ai-bar')?.classList.add('show');
+      later(() => {
+        const bf = document.getElementById('s11bf');
+        const af = document.getElementById('s11af');
+        if (bf) bf.style.width = '100%';
+        if (af) af.style.width = '42.9%';
+      }, 300);
+    }, 11000);
+    later(() => document.getElementById('s11-flow')?.classList.add('show'), 14000);
+  }
+});
+
+// ─── S12: CASH RESILIENCE ─────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "13-week P10/P50/P90 scenarios. Confirmed cash stays separate from expected.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">Cash Position — 13-Week Resilience Forecast</div>
+      <div id="s12-content">
+        <div id="s12-header-metric">
+          <div class="s12-metric-label">CONFIRMED CASH</div>
+          <div class="s12-metric-val">₹2,13,02,329</div>
+        </div>
+        <div id="s12-chart-wrap">
+          <svg id="s12-chart-svg" viewBox="0 0 760 148" preserveAspectRatio="none">
+            <path d="M0,118 C60,108 120,98 180,103 C240,108 300,88 360,93 C420,98 480,78 540,83 C600,88 660,68 720,73 L720,28 C660,23 600,43 540,38 C480,33 420,53 360,48 C300,43 240,63 180,58 C120,53 60,63 0,68 Z" fill="rgba(240,180,41,0.10)" stroke="none" opacity="0">
+              <animate attributeName="opacity" from="0" to="1" dur="1s" begin="0.5s" fill="freeze"/>
+            </path>
+            <path d="M0,118 C60,108 120,98 180,103 C240,108 300,88 360,93 C420,98 480,78 540,83 C600,88 660,68 720,73" fill="none" stroke="rgba(240,180,41,0.35)" stroke-width="1.5" stroke-dasharray="6,4" opacity="0">
+              <animate attributeName="opacity" from="0" to="1" dur="0.8s" begin="0.8s" fill="freeze"/>
+            </path>
+            <path d="M0,68 C60,63 120,53 180,58 C240,63 300,43 360,48 C420,53 480,33 540,38 C600,43 660,23 720,28" fill="none" stroke="rgba(240,180,41,0.35)" stroke-width="1.5" stroke-dasharray="6,4" opacity="0">
+              <animate attributeName="opacity" from="0" to="1" dur="0.8s" begin="0.8s" fill="freeze"/>
+            </path>
+            <path d="M0,93 C60,86 120,76 180,80 C240,86 300,66 360,70 C420,76 480,56 540,60 C600,66 660,46 720,50" fill="none" stroke="var(--partial)" stroke-width="2.5" stroke-dasharray="760" stroke-dashoffset="760" opacity="0">
+              <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="1s" fill="freeze"/>
+              <animate attributeName="stroke-dashoffset" from="760" to="0" dur="2.5s" begin="1s" fill="freeze"/>
+            </path>
+            <text x="0"   y="144" font-size="9" fill="#69727E" font-family="JetBrains Mono">Wk 1</text>
+            <text x="108" y="144" font-size="9" fill="#69727E" font-family="JetBrains Mono">Wk 4</text>
+            <text x="238" y="144" font-size="9" fill="#69727E" font-family="JetBrains Mono">Wk 7</text>
+            <text x="368" y="144" font-size="9" fill="#69727E" font-family="JetBrains Mono">Wk 10</text>
+            <text x="678" y="144" font-size="9" fill="#69727E" font-family="JetBrains Mono">Wk 13</text>
+          </svg>
+        </div>
+        <div id="s12-legend">
+          <span><span class="s12-legend-dot" style="background:var(--matched)"></span>Confirmed</span>
+          <span><span class="s12-legend-dot" style="background:var(--partial)"></span>Expected (P50)</span>
+          <span><span class="s12-legend-dot" style="background:var(--accent);opacity:0.5"></span>P10–P90 Range</span>
+          <span><span class="s12-legend-dot" style="background:var(--exception)"></span>At-Risk</span>
+          <span><span class="s12-legend-dot" style="background:var(--ink-3);opacity:0.4"></span>Unresolved</span>
+        </div>
+        <div id="s12-payroll">
+          <div class="s12-payroll-box"><div class="s12-payroll-label">NEXT PAYROLL</div><div class="s12-payroll-val">₹18,40,000</div></div>
+          <div class="s12-payroll-box"><div class="s12-payroll-label">P10 CASH AFTER PAYROLL</div><div class="s12-payroll-val">₹32,14,000</div></div>
+          <div class="s12-payroll-box"><div class="s12-payroll-label">PAYROLL RISK</div><div class="s12-payroll-val" style="color:var(--matched)">LOW</div></div>
+        </div>
+        <div id="s12-disclaimer">PROJECTIONS NEVER MASQUERADE AS FINANCIAL FACTS</div>
+      </div>`;
+
+    later(() => document.getElementById('s12-header-metric')?.classList.add('show'), 400);
+    later(() => document.getElementById('s12-chart-wrap')?.classList.add('show'), 1100);
+    later(() => document.getElementById('s12-legend')?.classList.add('show'), 3200);
+    later(() => document.getElementById('s12-payroll')?.classList.add('show'), 4200);
+    later(() => document.getElementById('s12-disclaimer')?.classList.add('show'), 6200);
+  }
+});
+
+// ─── S13: FINANCE COPILOT ─────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Every answer is grounded. When evidence isn't there, it refuses.",
+  render(el) {
+    el.innerHTML = `
+      <div class="scene-title">Finance Copilot — Grounded · Cited · Bounded</div>
+      <div id="s13-chat">
+        <div id="s13-chat-header">🤖&nbsp; Finance Copilot</div>
+        <div id="s13-messages">
+          <div class="s13-bubble user" id="s13m0">What is the current match rate?</div>
+          <div class="s13-bubble system" id="s13m1">Match rate is <strong style="color:var(--matched)">93.06%</strong> (469 of 504 records matched).<br>Run: RUN-00002 · Completed: 2026-09-05<br><span class="s13-source-link">[Source: /api/metrics]</span></div>
+          <div class="s13-bubble user" id="s13m2">What are the largest unresolved exceptions?</div>
+          <div class="s13-bubble system" id="s13m3">Top 3 unresolved exceptions:<br><span style="color:var(--exception)">1.</span> RECON-000198 — ₹24,800 — UNKNOWN_BANK_CREDIT<br><span style="color:var(--exception)">2.</span> RECON-000204 — ₹18,400 — MISSING_SETTLEMENT<br><span style="color:var(--exception)">3.</span> RECON-000211 — ₹9,200 — DUPLICATE_PAYMENT<br><span class="s13-source-link">[Source: /api/exceptions]</span></div>
+          <div class="s13-bubble user" id="s13m4">Should we acquire another company?</div>
+          <div class="s13-bubble refused" id="s13m5"><div class="s13-refused-label">INTENT_UNKNOWN</div>I can only answer questions grounded in verified financial data.<br>I do not have the information to answer this question.</div>
+        </div>
+      </div>
+      <div id="s13-grounded"><span class="hl">GROUNDED</span> &nbsp;·&nbsp; <span class="hl">CITED</span> &nbsp;·&nbsp; <span class="hl">BOUNDED</span></div>`;
+
+    const delays = [500, 2100, 5200, 6800, 10200, 11800];
+    ['s13m0','s13m1','s13m2','s13m3','s13m4','s13m5'].forEach((id, i) => {
+      later(() => {
+        const b = document.getElementById(id);
+        b?.classList.add('show');
+        b?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, delays[i]);
+    });
+    later(() => document.getElementById('s13-grounded')?.classList.add('show'), 14000);
+  }
+});
+
+// ─── S14: FINAL PROOF ────────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Built on measurable accuracy, controlled AI, and auditable decisions.",
+  render(el) {
+    const lines = [
+      { num:'180 / 180', label:'BACKEND TESTS PASSED' },
+      { num:'18 / 18',   label:'FRONTEND TESTS PASSED' },
+      { num:'100%',      label:'PRECISION' },
+      { num:'100%',      label:'RECALL' },
+      { num:'0',         label:'FALSE POSITIVES' },
+      { num:'57.1%',     label:'AI DEPENDENCY REDUCTION' },
+      { num:'~9,700',    label:'RECORDS / SECOND' },
+      { num:'₹0.01',     label:'MONETARY PRECISION' },
+    ];
+
+    let html = '<div id="s14-metrics">';
+    lines.forEach((l,i) => { html += `<div class="s14-metric-line" id="s14l${i}"><span class="s14-check">✓</span><span class="s14-num">${l.num}</span><span class="s14-label">${l.label}</span></div>`; });
+    html += '</div>';
+    el.innerHTML = `<div class="scene-title">Proof — Every Number is Real</div>${html}`;
+
+    lines.forEach((_,i) => later(() => document.getElementById('s14l' + i)?.classList.add('show'), 300 + i * 660));
+  }
+});
+
+// ─── S15: FINAL SCREEN ────────────────────────────────────────────────────────
+SCENES.push({
+  voiceover: "Deterministic first. AI second. Human when uncertain.",
+  render(el) {
+    el.innerHTML = `
+      <div style="text-align:center;width:100%">
+        <div id="s15-verbs">
+          <div class="s15-verb text-matched" id="s15v0">RECONCILE</div>
+          <div class="s15-verb text-partial" id="s15v1">RESOLVE</div>
+          <div class="s15-verb text-accent"  id="s15v2">LEARN</div>
+          <div class="s15-verb" style="color:var(--ink)"   id="s15v3">FORECAST</div>
+          <div class="s15-verb" style="color:var(--ink-2)" id="s15v4">EXPLAIN</div>
+        </div>
+        <div id="s15-logo-block">
+          <div id="s15-logo-main">🛡️ <span style="color:var(--accent)">RECON</span>GUARD</div>
+          <div id="s15-logo-sub">The self-auditing finance controller.</div>
+          <div id="s15-tagline">"ReconGuard never guesses the books."</div>
+        </div>
+        <div id="s15-final-caption">
+          Deterministic first<span class="s15-dot">·</span>AI second<span class="s15-dot">·</span>Human when uncertain
+        </div>
+      </div>`;
+
+    [0,1,2,3,4].forEach(i => later(() => document.getElementById('s15v' + i)?.classList.add('show'), 300 + i * 580));
+
+    later(() => {
+      const v = document.getElementById('s15-verbs');
+      if (v) { v.style.transition = 'opacity 1s ease'; v.style.opacity = '0'; }
+      later(() => document.getElementById('s15-logo-block')?.classList.add('show'), 700);
+      later(() => document.getElementById('s15-final-caption')?.classList.add('show'), 2000);
+    }, 6000);
+  }
+});
+
+// ─── Bootstrap ────────────────────────────────────────────────────────────────
+mountScene(0);
+scheduleNext();
+</script>
+</body>
+</html>
